@@ -152,6 +152,7 @@ def main():
     global SYMBOLS, last_fetch_time
 
     print("🟢 Bot đang chạy...")
+    send_telegram_alert(f"Start server Top 10:\n```{str(e)}```", is_critical=False)
 
     while True:
         try:
