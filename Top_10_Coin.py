@@ -152,7 +152,7 @@ def main():
     global SYMBOLS, last_fetch_time
 
     print("🟢 Bot đang chạy...")
-    send_telegram_alert(f"Start server 200 coin", is_critical=False)
+    send_telegram_alert(f"Start server 10 coin", is_critical=False)
 
     while True:
         try:
