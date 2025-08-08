@@ -8,13 +8,42 @@ import traceback
 VIETNAM_TIMEZONE = ZoneInfo("Asia/Ho_Chi_Minh")
 TELEGRAM_BOT_TOKEN = "8226246719:AAHXDggFiFYpsgcq1vwTAWv7Gsz1URP4KEU"
 TELEGRAM_CHAT_ID = "-4706073326"
-TOP_SYMBOL_LIMIT = 10
+TOP_SYMBOL_LIMIT = 30
 RATE_PERCENT = 0.25
 RATE_BODY  = 0.66 
 
-
-SYMBOLS = []
-last_fetch_time = None
+SYMBOLS = [
+    "BTC",   # Bitcoin
+    "ETH",   # Ethereum
+    "XRP",   # XRP
+    "BNB",   # Binance Coin
+    "SOL",   # Solana
+    "DOGE",  # Dogecoin
+    "ADA",   # Cardano
+    "TRX",   # TRON
+    "WBTC",  # Wrapped Bitcoin
+    "XLM",   # Stellar
+    "ETH"    # Sui (SUI)
+    "LINK",  # Chainlink
+    "DOT",   # Polkadot
+    "AVAX",  # Avalanche
+    "LTC",   # Litecoin (top 30 range)
+    "SHIB",  # Shiba Inu (top 30)
+    "DAI",   # Dai (stablecoin)
+    "WBTC",  # Wrapped Bitcoin (already counted)
+    "MATIC", # Polygon (top 30)
+    "NEAR",  # Near Protocol (top 30)
+    "ATOM",  # Cosmos (top 30)
+    "ETC",   # Ethereum Classic (top 30)
+    "APT",   # Aptos (top 30)
+    "OP",    # Optimism (top 30)
+    "BCH",   # Bitcoin Cash (top 30)
+    "LINK",  # Chainlink (already)
+    "UNI",   # Uniswap (top 30)
+    "ALGO",  # Algorand (top 30)
+    "GRT",   # The Graph (top 30)
+    "ONT"    # FTX Token (historically top, might remain in top 30)
+]
 
 def send_telegram_alert(message, is_critical=False):
     try:
@@ -31,30 +60,6 @@ def send_telegram_alert(message, is_critical=False):
         )
     except Exception as e:
         print(f"⚠️ Telegram alert error: {e}")
-
-def fetch_top_symbols():
-    try:
-        print(f"🔁 Lấy danh sách top {TOP_SYMBOL_LIMIT} coin volume cao...")
-        url = "https://fapi.binance.com/fapi/v1/ticker/24hr"
-        response = requests.get(url, timeout=10)
-        response.raise_for_status()
-        data = response.json()
-
-        futures_usdt = [x for x in data if x['symbol'].endswith("USDT") and not x['symbol'].endswith("BUSD")]
-        sorted_by_volume = sorted(futures_usdt, key=lambda x: float(x['quoteVolume']), reverse=True)
-
-        symbols = []
-        for item in sorted_by_volume[:TOP_SYMBOL_LIMIT]:
-            symbols.append({
-                "symbol": item["symbol"],
-                "candle_interval": "5m",
-                "limit": 2
-            })
-
-        return symbols
-    except Exception as e:
-        send_telegram_alert(f"Lỗi lấy top coin:\n```{str(e)}```", is_critical=True)
-        return []
 
 def fetch_latest_candle(symbol_config):
     try:
@@ -142,27 +147,13 @@ def send_telegram_notification(symbol, candle, analysis):
     except Exception as e:
         print(f"❌ Telegram error: {e}")
 
-def should_refresh_symbols():
-    global last_fetch_time
-    if last_fetch_time is None or (datetime.now() - last_fetch_time) >= timedelta(hours=24):
-        return True
-    return False
-
 def main():
-    global SYMBOLS, last_fetch_time
 
     print("🟢 Bot đang chạy...")
-    send_telegram_alert(f"Start server Top 10", is_critical=False)
 
     while True:
         try:
             now_utc = datetime.utcnow().replace(tzinfo=ZoneInfo("UTC"))
-
-            if should_refresh_symbols():
-                SYMBOLS = fetch_top_symbols()
-                last_fetch_time = datetime.now()
-                print(f"✅ Cập nhật SYMBOLS lúc {last_fetch_time}")
-
             if now_utc.minute % 5 == 0 and now_utc.second < 3:
                 print(f"\n⏱ Kiểm tra lúc {datetime.now(VIETNAM_TIMEZONE).strftime('%Y-%m-%d %H:%M:%S')}")
                 for sym in SYMBOLS:
