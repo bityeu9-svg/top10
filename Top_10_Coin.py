@@ -1,5 +1,5 @@
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime
 from zoneinfo import ZoneInfo
 import time
 import traceback
@@ -8,13 +8,21 @@ import traceback
 VIETNAM_TIMEZONE = ZoneInfo("Asia/Ho_Chi_Minh")
 TELEGRAM_BOT_TOKEN = "8226246719:AAHXDggFiFYpsgcq1vwTAWv7Gsz1URP4KEU"
 TELEGRAM_CHAT_ID = "-4706073326"
-TOP_SYMBOL_LIMIT = 10
-RATE_PERCENT = 0.25
-RATE_BODY  = 0.66 
+RATE_PERCENT = 0.3
+RATE_BODY = 0.66
 
-
-SYMBOLS = []
-last_fetch_time = None
+# Danh sách coin cố định
+SYMBOLS = [
+    {"symbol": s, "candle_interval": "5m", "limit": 2}
+    for s in [
+        "BTCUSDT", "ETHUSDT", "SOLUSDT", "PUMPUSDT",
+        "BNBUSDT", "XRPUSDT", "ADAUSDT", "DOGEUSDT", "TRXUSDT", "TONUSDT",
+        "LINKUSDT", "MATICUSDT", "DOTUSDT", "LTCUSDT", "SHIBUSDT",
+        "AVAXUSDT", "UNIUSDT", "BCHUSDT", "ETCUSDT", "XLMUSDT",
+        "ATOMUSDT", "XMRUSDT", "APTUSDT", "FILUSDT", "HBARUSDT",
+        "VETUSDT", "NEARUSDT", "INJUSDT", "OPUSDT", "RNDRUSDT"
+    ]
+]
 
 def send_telegram_alert(message, is_critical=False):
     try:
@@ -31,30 +39,6 @@ def send_telegram_alert(message, is_critical=False):
         )
     except Exception as e:
         print(f"⚠️ Telegram alert error: {e}")
-
-def fetch_top_symbols():
-    try:
-        print(f"🔁 Lấy danh sách top {TOP_SYMBOL_LIMIT} coin volume cao...")
-        url = "https://fapi.binance.com/fapi/v1/ticker/24hr"
-        response = requests.get(url, timeout=10)
-        response.raise_for_status()
-        data = response.json()
-
-        futures_usdt = [x for x in data if x['symbol'].endswith("USDT") and not x['symbol'].endswith("BUSD")]
-        sorted_by_volume = sorted(futures_usdt, key=lambda x: float(x['quoteVolume']), reverse=True)
-
-        symbols = []
-        for item in sorted_by_volume[:TOP_SYMBOL_LIMIT]:
-            symbols.append({
-                "symbol": item["symbol"],
-                "candle_interval": "5m",
-                "limit": 2
-            })
-
-        return symbols
-    except Exception as e:
-        send_telegram_alert(f"Lỗi lấy top coin:\n```{str(e)}```", is_critical=True)
-        return []
 
 def fetch_latest_candle(symbol_config):
     try:
@@ -142,28 +126,15 @@ def send_telegram_notification(symbol, candle, analysis):
     except Exception as e:
         print(f"❌ Telegram error: {e}")
 
-def should_refresh_symbols():
-    global last_fetch_time
-    if last_fetch_time is None or (datetime.now() - last_fetch_time) >= timedelta(hours=24):
-        return True
-    return False
-
 def main():
-    global SYMBOLS, last_fetch_time
-
     print("🟢 Bot đang chạy...")
-    send_telegram_alert(f"Start server 10 coin", is_critical=False)
+    send_telegram_alert(f"Start server 30 coin", is_critical=False)
 
     while True:
         try:
             now_utc = datetime.utcnow().replace(tzinfo=ZoneInfo("UTC"))
 
-            if should_refresh_symbols():
-                SYMBOLS = fetch_top_symbols()
-                last_fetch_time = datetime.now()
-                print(f"✅ Cập nhật SYMBOLS lúc {last_fetch_time}")
-
-            if now_utc.minute % 5 == 0 and now_utc.second < 3:
+            if now_utc.minute % 15 == 0 and now_utc.second < 3:
                 print(f"\n⏱ Kiểm tra lúc {datetime.now(VIETNAM_TIMEZONE).strftime('%Y-%m-%d %H:%M:%S')}")
                 for sym in SYMBOLS:
                     candle = fetch_latest_candle(sym)
@@ -171,10 +142,10 @@ def main():
                         continue
                     analysis = analyze_candle(candle)
                     if analysis:
-                        print(f"✔️ {sym['symbol']} | {analysis['candle_type']} | Râu nến trên: {analysis['upper_wick_percent']:.4f}% | % Râu nến dưới: {analysis['lower_wick_percent']:.4f}%")
+                        print(f"✔️ {sym['symbol']} | {analysis['candle_type']} | Râu nến trên: {analysis['upper_wick_percent']:.4f}% | Râu nến dưới: {analysis['lower_wick_percent']:.4f}%")
                         send_telegram_notification(sym['symbol'], candle, analysis)
 
-                time.sleep(300 - now_utc.second % 60)  # Đợi hết 1 phút tránh trùng
+                time.sleep(900 - now_utc.second % 60)  # Đợi hết 1 phút tránh trùng
             else:
                 time.sleep(1)
         except Exception as e:
