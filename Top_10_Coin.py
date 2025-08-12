@@ -10,6 +10,7 @@ TELEGRAM_BOT_TOKEN = "8226246719:AAHXDggFiFYpsgcq1vwTAWv7Gsz1URP4KEU"
 TELEGRAM_CHAT_ID = "-4706073326"
 RATE_PERCENT = 0.3
 RATE_BODY = 0.66
+RATE_NEN_01_02 = 0.2
 
 # Danh sách coin cố định
 SYMBOLS = [
@@ -52,13 +53,25 @@ def fetch_latest_candle(symbol_config):
         response.raise_for_status()
         data = response.json()
         # Lấy cây nến đóng cửa gần nhất
-        candle = data[-1]
+        candle_01 = data[-1]
+        high_01 = float(candle_01[1])
+        low_01 = float(candle_01[3])
+        body_size_01 = abs(high_01 - low_01)
+        # Lấy cây nến đóng cửa gần thứ 2
+        candle_02 = data[-2]
+        high_02 = float(candle_02[1])
+        low_02 = float(candle_02[3])
+        body_size_02 = abs(high_02 - low_02)
+         # So sánh tỉ lệ cây nến đóng gần nhất với case nến trước đó
+        if ((body_size_01 /  body_size_02)-1) < RATE_NEN_01_02:
+            print("râu nến đang check không lớn hơn 1.25 nến trước đó!")
+            return None
         return {
-            "open_time": datetime.fromtimestamp(candle[0] / 1000).replace(tzinfo=ZoneInfo("UTC")),
-            "open": float(candle[1]),
-            "high": float(candle[2]),
-            "low": float(candle[3]),
-            "close": float(candle[4])
+            "open_time": datetime.fromtimestamp(candle_01[0] / 1000).replace(tzinfo=ZoneInfo("UTC")),
+            "open": float(candle_01[1]),
+            "high": float(candle_01[2]),
+            "low": float(candle_01[3]),
+            "close": float(candle_01[4])
         }
     except Exception as e:
         print(f"Lỗi lấy nến {symbol_config['symbol']}: {e}")
