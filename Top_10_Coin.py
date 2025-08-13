@@ -141,13 +141,13 @@ def send_telegram_notification(symbol, candle, analysis):
 
 def main():
     print("🟢 Bot đang chạy...")
-    send_telegram_alert(f"Start server 30 coin", is_critical=False)
+    send_telegram_alert(f"Start server 10 coin", is_critical=False)
 
     while True:
         try:
             now_utc = datetime.utcnow().replace(tzinfo=ZoneInfo("UTC"))
 
-            if now_utc.minute % 5 == 0 and now_utc.second < 3:
+            if now_utc.minute % 5 == 0 and now_utc.second < 20:
                 print(f"\n⏱ Kiểm tra lúc {datetime.now(VIETNAM_TIMEZONE).strftime('%Y-%m-%d %H:%M:%S')}")
                 for sym in SYMBOLS:
                     candle = fetch_latest_candle(sym)
