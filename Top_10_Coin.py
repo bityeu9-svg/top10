@@ -14,7 +14,7 @@ RATE_NEN_01_02 = 0.2
 
 # Danh sách coin cố định
 SYMBOLS = [
-    {"symbol": s, "candle_interval": "5m", "limit": 2}
+    {"symbol": s, "candle_interval": "15m", "limit": 2}
     for s in [
         "BTCUSDT", "ETHUSDT", "SOLUSDT", "PUMPUSDT",
         "BNBUSDT", "XRPUSDT", "ADAUSDT", "DOGEUSDT", "TRXUSDT", "TONUSDT",
