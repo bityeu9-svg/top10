@@ -3,25 +3,30 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 import time
 import traceback
-
 # ========== CẤU HÌNH ==========
 VIETNAM_TIMEZONE = ZoneInfo("Asia/Ho_Chi_Minh")
 TELEGRAM_BOT_TOKEN = "8226246719:AAHXDggFiFYpsgcq1vwTAWv7Gsz1URP4KEU"
 TELEGRAM_CHAT_ID = "-4706073326"
-RATE_PERCENT = 0.3
-RATE_BODY = 0.66
-RATE_NEN_01_02 = 0.2
-
+RATE_PERCENT_TOP = 0.4
+RATE_PERCENT_MID = 0.68
+RATE_PERCENT_LOW = 0.8
+RATE_BODY = 0.5
+CHART_TYPE = "15m"
 # Danh sách coin cố định
 SYMBOLS = [
-    {"symbol": s, "candle_interval": "15m", "limit": 2}
+    {"symbol": s, "candle_interval": CHART_TYPE, "limit": 2}
     for s in [
-        "BTCUSDT", "ETHUSDT", "SOLUSDT", "PUMPUSDT",
+        "BTCUSDT", "ETHUSDT", "SOLUSDT",
         "BNBUSDT", "XRPUSDT", "ADAUSDT", "DOGEUSDT", "TRXUSDT", "TONUSDT",
-        "LINKUSDT", "MATICUSDT", "DOTUSDT", "LTCUSDT", "SHIBUSDT",
+        "LINKUSDT", "MATICUSDT", "DOTUSDT", "LTCUSDT",
         "AVAXUSDT", "UNIUSDT", "BCHUSDT", "ETCUSDT", "XLMUSDT",
         "ATOMUSDT", "XMRUSDT", "APTUSDT", "FILUSDT", "HBARUSDT",
-        "VETUSDT", "NEARUSDT", "INJUSDT", "OPUSDT", "RNDRUSDT"
+        "VETUSDT", "NEARUSDT", "INJUSDT", "OPUSDT", "SUIUSDT",
+        # Thêm các đồng coin phổ biến khác trên Binance
+        "CRVUSDT", "ARKMUSDT", "JASMYUSDT", "WIFUSDT", "TIAUSDT",
+        "ORDIUSDT", "1000PEPEUSDT", "SEIUSDT", "BLURUSDT", "MEMEUSDT",
+        "STXUSDT", "SSVUSDT", "LDOUSDT", "DYDXUSDT", "GMXUSDT",
+        "AGIXUSDT", "FETUSDT", "GALAUSDT", "SANDUSDT", "APEUSDT"
     ]
 ]
 
@@ -50,29 +55,20 @@ def fetch_latest_candle(symbol_config):
             "limit": symbol_config["limit"]
         }
         response = requests.get(url, params=params, timeout=10)
-        response.raise_for_status()
         data = response.json()
-        # Lấy cây nến đóng cửa gần nhất
-        candle_01 = data[-1]
-        high_01 = float(candle_01[1])
-        low_01 = float(candle_01[3])
-        body_size_01 = abs(high_01 - low_01)
-        # Lấy cây nến đóng cửa gần thứ 2
-        candle_02 = data[-2]
-        high_02 = float(candle_02[1])
-        low_02 = float(candle_02[3])
-        body_size_02 = abs(high_02 - low_02)
-         # So sánh tỉ lệ cây nến đóng gần nhất với case nến trước đó
-        if ((body_size_01 /  body_size_02)-1) < RATE_NEN_01_02:
-            print("râu nến đang check không lớn hơn 1.25 nến trước đó!")
-            return None
-        return {
-            "open_time": datetime.fromtimestamp(candle_01[0] / 1000).replace(tzinfo=ZoneInfo("UTC")),
-            "open": float(candle_01[1]),
-            "high": float(candle_01[2]),
-            "low": float(candle_01[3]),
-            "close": float(candle_01[4])
-        }
+        # Lấy nến đã đóng cửa gần nhất và nến hiện tại
+        closed_candle = data[-2]
+        current_candle = data[-1]
+        def parse_candle(candle):
+            return {
+                "open_time": datetime.fromtimestamp(candle[0] / 1000).replace(tzinfo=ZoneInfo("UTC")),
+                "open": float(candle[1]),
+                "high": float(candle[2]),
+                "low": float(candle[3]),
+                "close": float(candle[4]),
+                "symbol": symbol_config["symbol"]
+            }
+        return [parse_candle(closed_candle), parse_candle(current_candle)]
     except Exception as e:
         print(f"Lỗi lấy nến {symbol_config['symbol']}: {e}")
         return None
@@ -83,18 +79,59 @@ def analyze_candle(candle):
         high_price = candle["high"]
         low_price = candle["low"]
         close_price = candle["close"]
+        print(f"Phân tích nến {candle['symbol']} - Open: {open_price}, High: {high_price}, Low: {low_price}, Close: {close_price}")
 
         upper = high_price - max(open_price, close_price)
         upper_percent = (upper / max(open_price, close_price)) * 100 if max(open_price, close_price) > 0 else 0
+        print(f"Râu nến trên: {upper_percent:.4f}%")
 
         lower = min(open_price, close_price) - low_price
-        lower_percent = (lower / low_price) * 100 if low_price > 0 else 0
+        lower_percent = (lower / low_price) * 100 if low_price > 0 else 0 and close_price < open_price
+        print(f"Râu nến dưới: {lower_percent:.4f}%")
+
+        # Xác định ngưỡng phần trăm râu nến theo cặp
+        current_symbol = candle.get("symbol") if "symbol" in candle else None
+        # Phân nhóm coin để chọn ngưỡng wick_percent_threshold
+        COINS_TOP = {"BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT"}
+        COINS_MID = {
+            "XRPUSDT", "ADAUSDT", "DOGEUSDT", "TRXUSDT", "TONUSDT",
+            "LINKUSDT", "MATICUSDT", "DOTUSDT", "LTCUSDT",
+            "AVAXUSDT", "UNIUSDT", "BCHUSDT", "ETCUSDT", "XLMUSDT",
+            "ATOMUSDT", "XMRUSDT", "APTUSDT", "FILUSDT", "HBARUSDT",
+            "VETUSDT", "NEARUSDT", "INJUSDT", "OPUSDT", "SUIUSDT"
+        }
+        if current_symbol in COINS_TOP:
+            wick_percent_threshold = RATE_PERCENT_TOP
+        elif current_symbol in COINS_MID:
+            wick_percent_threshold = RATE_PERCENT_MID
+        else:
+            wick_percent_threshold = RATE_PERCENT_LOW
 
         candle_type = "other"
-        if lower_percent >= RATE_PERCENT and lower / (high_price - low_price) >= RATE_BODY:
+        # Râu nến dưới dài, râu trên < 0.1%
+        if (
+            lower_percent >= wick_percent_threshold
+            and lower / (high_price - low_price) >= RATE_BODY
+            and close_price > open_price
+            and upper_percent < 0.1
+        ):
             candle_type = "Râu nến dưới"
-        elif upper_percent >= RATE_PERCENT and upper / (high_price - low_price) >= RATE_BODY:
+        # Râu nến trên dài, râu dưới < 0.1%
+        elif (
+            upper_percent >= wick_percent_threshold
+            and upper / (high_price - low_price) >= RATE_BODY
+            and close_price < open_price
+            and lower_percent < 0.1
+        ):
             candle_type = "Râu nến trên"
+
+        # Xác định hướng xu hướng dựa trên giá đóng/mở
+        if candle_type  ==  "Râu nến dưới":
+            trend_direction = "Long"
+        elif candle_type  ==  "Râu nến trên":
+            trend_direction = "Short"
+        else:
+            trend_direction = "Sideways"
 
         return {
             "candle_type": candle_type,
@@ -104,7 +141,7 @@ def analyze_candle(candle):
             "close": close_price,
             "upper_wick_percent": round(upper_percent, 2),
             "lower_wick_percent": round(lower_percent, 2),
-            "trend_direction": "LONG" if candle_type == "Râu nến dưới" else "SHORT" if candle_type == "Râu nến trên" else "-"
+            "trend_direction": trend_direction
         }
     except Exception as e:
         send_telegram_alert(f"Lỗi phân tích nến:\n```{str(e)}```", is_critical=True)
@@ -141,26 +178,29 @@ def send_telegram_notification(symbol, candle, analysis):
 
 def main():
     print("🟢 Bot đang chạy...")
-    send_telegram_alert(f"Start server 10 coin", is_critical=False)
-
+    send_telegram_alert(f"Start server 30 coin", is_critical=False)
     while True:
         try:
-            now_utc = datetime.utcnow().replace(tzinfo=ZoneInfo("UTC"))
-
-            if now_utc.minute % 15 == 0 and now_utc.second < 20:
-                print(f"\n⏱ Kiểm tra lúc {datetime.now(VIETNAM_TIMEZONE).strftime('%Y-%m-%d %H:%M:%S')}")
+            now_utc = datetime.now(ZoneInfo("UTC"))
+            print(f"🕒 Thời gian start: {now_utc.strftime('%Y-%m-%d %H:%M:%S')} UTC")
+            # Chạy mỗi 15 phút (có thể điều chỉnh theo nhu cầu)
+            if now_utc.minute % 15 == 0 and now_utc.second < 10:
                 for sym in SYMBOLS:
-                    candle = fetch_latest_candle(sym)
-                    if not candle:
+                    candles = fetch_latest_candle(sym)
+                    if not candles:
                         continue
-                    analysis = analyze_candle(candle)
-                    if analysis:
-                        print(f"✔️ {sym['symbol']} | {analysis['candle_type']} | Râu nến trên: {analysis['upper_wick_percent']:.4f}% | Râu nến dưới: {analysis['lower_wick_percent']:.4f}%")
-                        send_telegram_notification(sym['symbol'], candle, analysis)
-
-                time.sleep(900 - now_utc.second % 60)  # Đợi hết 15 phút tránh trùng
+                    for candle in candles:
+                        analysis = analyze_candle(candle)
+                        if analysis and analysis["candle_type"] != "other":
+                            print(f"✔️ {sym['symbol']} | {analysis['candle_type']} | Râu nến trên: {analysis['upper_wick_percent']:.4f}% | Râu nến dưới: {analysis['lower_wick_percent']:.4f}%")
+                            send_telegram_notification(sym['symbol'], candle, analysis)
+                # Tính thời gian chờ đến mốc 15 phút tiếp theo
+                now_utc = datetime.now(ZoneInfo("UTC"))
+                print(f"🕒 trước khi sleep {now_utc.strftime('%Y-%m-%d %H:%M:%S')} UTC")
+                time.sleep(900 - now_utc.second-2)
             else:
                 time.sleep(1)
+            print(f"🕒 Thời gian end: {now_utc.strftime('%Y-%m-%d %H:%M:%S')} UTC")    
         except Exception as e:
             error_msg = f"LỖI VÒNG LẶP:\n{e}\n{traceback.format_exc()}"
             print(error_msg)
